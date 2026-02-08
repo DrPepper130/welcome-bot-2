@@ -50,7 +50,7 @@ client.on("guildMemberAdd", async (member) => {
 
       try {
         const msg = await channel.send(`Hey <@${member.id}>, enjoy your stay! 😘💦`);
-        setTimeout(() => msg.delete().catch(() => {}), 3000);
+        setTimeout(() => msg.delete().catch(() => {}), 6000);
       } catch (err) {
         console.error(`Failed in channel ${channelId}:`, err);
       }
