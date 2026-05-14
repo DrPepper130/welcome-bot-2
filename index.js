@@ -1,5 +1,5 @@
 // index.js
-// Discord welcome bot + embed command + tiny web server for Render
+// Discord welcome bot + VIP embed command + tiny web server for Render
 
 const express = require("express");
 const {
@@ -9,6 +9,9 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } = require("discord.js");
 
 const channelIDs = [
@@ -23,7 +26,7 @@ const channelIDs = [
   "1499603884883185698",
   "1499603884883185703",
   "1499603885319524387",
-  "1499603885319524389"
+  "1499603885319524389",
 ];
 
 // ---- Web server ----
@@ -92,15 +95,54 @@ client.on("messageCreate", async (message) => {
       .setURL(accessVipContentLink),
 
     new ButtonBuilder()
+      .setCustomId("redeem_key")
       .setLabel("Redeem Key")
-      .setStyle(ButtonStyle.Link)
-      .setURL(clickChannelLink)
+      .setStyle(ButtonStyle.Success)
   );
 
   await message.channel.send({
     embeds: [embed],
     components: [buttons],
   });
+});
+
+// Button + popup modal handler
+client.on("interactionCreate", async (interaction) => {
+  if (interaction.isButton()) {
+    if (interaction.customId !== "redeem_key") return;
+
+    const modal = new ModalBuilder()
+      .setCustomId("redeem_key_modal")
+      .setTitle("Redeem VIP Key");
+
+    const keyInput = new TextInputBuilder()
+      .setCustomId("vip_key")
+      .setLabel("Enter your VIP key")
+      .setPlaceholder("Paste your key here")
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const row = new ActionRowBuilder().addComponents(keyInput);
+
+    modal.addComponents(row);
+
+    return interaction.showModal(modal);
+  }
+
+  if (interaction.isModalSubmit()) {
+    if (interaction.customId !== "redeem_key_modal") return;
+
+    const vipKey = interaction.fields.getTextInputValue("vip_key");
+
+    console.log(
+      `VIP key submitted by ${interaction.user.tag} (${interaction.user.id}): ${vipKey}`
+    );
+
+    await interaction.reply({
+      content: "✅ Your key was submitted. Please wait while it is reviewed.",
+      ephemeral: true,
+    });
+  }
 });
 
 // Sends a short welcome message in each channel and deletes it after 6s
