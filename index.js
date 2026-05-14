@@ -1,8 +1,15 @@
 // index.js
-// Discord welcome bot + tiny web server (required for Render)
+// Discord welcome bot + embed command + tiny web server for Render
 
 const express = require("express");
-const { Client, GatewayIntentBits } = require("discord.js");
+const {
+  Client,
+  GatewayIntentBits,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} = require("discord.js");
 
 const channelIDs = [
   "1456396121164480542",
@@ -19,7 +26,7 @@ const channelIDs = [
   "1499603885319524389"
 ];
 
-// ---- Web server (Render expects a listening port) ----
+// ---- Web server ----
 const app = express();
 
 app.get("/", (req, res) => {
@@ -36,18 +43,70 @@ if (!process.env.DISCORD_TOKEN) {
 }
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
 client.once("ready", () => {
   console.log(`Bot is online as ${client.user.tag}`);
 });
 
-// Sends a short welcome message in each channel and deletes it after 3s
+// Command:
+// ?vip imgurImage accessVipContentLink clickChannelLink
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
+  if (!message.content.startsWith("?vip")) return;
+
+  const args = message.content.trim().split(/\s+/);
+
+  const imgurImage = args[1];
+  const accessVipContentLink = args[2];
+  const clickChannelLink = args[3];
+
+  if (!imgurImage || !accessVipContentLink || !clickChannelLink) {
+    return message.reply(
+      "Usage: `?vip imgurImage accessVipContentLink clickChannelLink`"
+    );
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(0x00ff66)
+    .setTitle("🔞 Redeem your VIP Access key here! 🔞")
+    .setDescription(
+      "**Follow the simple steps below to unlock your private vault!**\n\n" +
+        `> Click [# 👑・VIP-ACCESS](${clickChannelLink}).\n` +
+        "> Complete checkout to redeem your key.\n" +
+        "> Press Redeem Key and enter the key.\n" +
+        "> Done - enjoy your access!"
+    )
+    .setImage(imgurImage);
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel("Access VIP Content")
+      .setStyle(ButtonStyle.Link)
+      .setURL(accessVipContentLink),
+
+    new ButtonBuilder()
+      .setLabel("Redeem Key")
+      .setStyle(ButtonStyle.Link)
+      .setURL(clickChannelLink)
+  );
+
+  await message.channel.send({
+    embeds: [embed],
+    components: [buttons],
+  });
+});
+
+// Sends a short welcome message in each channel and deletes it after 6s
 client.on("guildMemberAdd", async (member) => {
   console.log(`New member joined: ${member.user.tag} (${member.id})`);
 
-  // 200ms between channels (fast). If you get rate-limited, increase this to 1000-2000.
   const intervalMs = 200;
 
   channelIDs.forEach((channelId, i) => {
@@ -56,7 +115,9 @@ client.on("guildMemberAdd", async (member) => {
       if (!channel) return;
 
       try {
-        const msg = await channel.send(`Hey <@${member.id}>, enjoy your stay! 😘💦`);
+        const msg = await channel.send(
+          `Hey <@${member.id}>, enjoy your stay! 😘💦`
+        );
         setTimeout(() => msg.delete().catch(() => {}), 6000);
       } catch (err) {
         console.error(`Failed in channel ${channelId}:`, err);
