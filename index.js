@@ -67,7 +67,10 @@ async function sendDailyUpdate() {
       .setImage(url)
       .setFooter({ text: `Image ${index + 1} of 6` })
   );
-
+  
+  console.log("Selected images:", selectedImages);
+  console.log("Sending to channel:", DAILY_UPDATE_CHANNEL_ID);
+  
   await channel.send({
     content: customMessage,
     embeds,
