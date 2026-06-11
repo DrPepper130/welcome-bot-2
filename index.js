@@ -41,44 +41,6 @@ function pickRandomItems(array, count) {
   return [...array].sort(() => Math.random() - 0.5).slice(0, count);
 }
 
-async function sendDailyUpdate() {
-  if (!DAILY_UPDATE_CHANNEL_ID) {
-    console.error("Missing DAILY_UPDATE_CHANNEL_ID environment variable.");
-    return;
-  }
-
-  if (imgurImages.length < 6) {
-    console.error("IMGUR_IMAGES must contain at least 6 image URLs.");
-    return;
-  }
-
-  const channel = await client.channels.fetch(DAILY_UPDATE_CHANNEL_ID).catch(() => null);
-
-  if (!channel) {
-    console.error("Could not find daily update channel.");
-    return;
-  }
-
-  const selectedImages = pickRandomItems(imgurImages, 6);
-
-  const embeds = selectedImages.map((url, index) =>
-    new EmbedBuilder()
-      .setColor(0x00ff66)
-      .setImage(url)
-      .setFooter({ text: `Image ${index + 1} of 6` })
-  );
-  
-  console.log("Selected images:", selectedImages);
-  console.log("Sending to channel:", DAILY_UPDATE_CHANNEL_ID);
-  
-  await channel.send({
-    content: customMessage,
-    embeds,
-  });
-
-  console.log("Daily update sent.");
-}
-
 // ---- Web server ----
 const app = express();
 
@@ -104,10 +66,49 @@ const client = new Client({
   ],
 });
 
+async function sendDailyUpdate(customMessage = DAILY_UPDATE_MESSAGE) {
+  if (!DAILY_UPDATE_CHANNEL_ID) {
+    console.error("Missing DAILY_UPDATE_CHANNEL_ID environment variable.");
+    return;
+  }
+
+  const channel = await client.channels
+    .fetch(DAILY_UPDATE_CHANNEL_ID)
+    .catch(() => null);
+
+  if (!channel) {
+    console.error("Could not find daily update channel.");
+    return;
+  }
+
+  let embeds = [];
+
+  if (imgurImages.length >= 6) {
+    const selectedImages = pickRandomItems(imgurImages, 6);
+
+    embeds = selectedImages.map((url, index) =>
+      new EmbedBuilder()
+        .setColor(0x00ff66)
+        .setImage(url)
+        .setFooter({ text: `Image ${index + 1} of 6` })
+    );
+
+    console.log("Selected images:", selectedImages);
+  } else {
+    console.log("No images configured yet — sending text only.");
+  }
+
+  await channel.send({
+    content: customMessage,
+    embeds,
+  });
+
+  console.log("Daily update sent.");
+}
+
 client.once("ready", () => {
   console.log(`Bot is online as ${client.user.tag}`);
 
-  // Runs every day at 12:00 AM in your timezone
   cron.schedule(
     "0 0 * * *",
     async () => {
@@ -125,34 +126,39 @@ client.once("ready", () => {
   console.log(`Daily update scheduled for 12:00 AM ${TIMEZONE}`);
 });
 
-// Command:
-// ?vip imgurImage accessVipContentLink clickChannelLink
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
-// MANUAL DAILY TEST
+  // Manual daily test:
+  // ?dailytest your custom message here
   if (message.content.startsWith("?dailytest")) {
     try {
-      const customMessage = message.content
-        .replace("?dailytest", "")
-        .trim();
+      const customMessage = message.content.replace("?dailytest", "").trim();
 
-      await sendDailyUpdate(
-        customMessage || DAILY_UPDATE_MESSAGE
-      );
+      await sendDailyUpdate(customMessage || DAILY_UPDATE_MESSAGE);
 
-      return message.reply("✅");
+      return message.react("✅");
     } catch (err) {
-      console.error(err);
-
-      return message.reply(
-        `❌ Failed:\n\`\`\`${err.message}\`\`\``
-      );
+      console.error("Daily test failed:", err);
+      return message.react("❌");
     }
   }
 
-// VIP COMMAND
-if (!message.content.startsWith("?vip")) return;
+  // Command:
+  // ?vip imgurImage accessVipContentLink clickChannelLink
+  if (!message.content.startsWith("?vip")) return;
+
+  const args = message.content.trim().split(/\s+/);
+
+  const imgurImage = args[1];
+  const accessVipContentLink = args[2];
+  const clickChannelLink = args[3];
+
+  if (!imgurImage || !accessVipContentLink || !clickChannelLink) {
+    return message.reply(
+      "Usage: `?vip imgurImage accessVipContentLink clickChannelLink`"
+    );
+  }
 
   const embed = new EmbedBuilder()
     .setColor(0x00ff66)
@@ -184,7 +190,6 @@ if (!message.content.startsWith("?vip")) return;
   });
 });
 
-// Button + popup modal handler
 client.on("interactionCreate", async (interaction) => {
   if (interaction.isButton()) {
     if (interaction.customId !== "redeem_key") return;
@@ -223,7 +228,6 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-// Sends a short welcome message in each channel and deletes it after 6s
 client.on("guildMemberAdd", async (member) => {
   console.log(`New member joined: ${member.user.tag} (${member.id})`);
 
