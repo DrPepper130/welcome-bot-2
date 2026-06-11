@@ -141,7 +141,7 @@ client.on("messageCreate", async (message) => {
         customMessage || DAILY_UPDATE_MESSAGE
       );
 
-      return message.reply("✅ Daily update actually posted.");
+      return message.reply("✅");
     } catch (err) {
       console.error(err);
 
