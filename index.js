@@ -83,8 +83,8 @@ async function sendDailyUpdate(customMessage = DAILY_UPDATE_MESSAGE) {
 
   let embeds = [];
 
-  if (imgurImages.length >= 6) {
-    const selectedImages = pickRandomItems(imgurImages, 6);
+  if (imgurImages.length > 0) {
+    const selectedImages = pickRandomItems(imgurImages, Math.min(6, imgurImages.length));
 
     embeds = selectedImages.map((url, index) =>
       new EmbedBuilder()
