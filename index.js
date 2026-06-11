@@ -67,24 +67,61 @@ const client = new Client({
 });
 
 async function sendDailyUpdate(customMessage = DAILY_UPDATE_MESSAGE) {
-  if (!DAILY_UPDATE_CHANNEL_ID) return console.error("Missing DAILY_UPDATE_CHANNEL_ID.");
+  if (!DAILY_UPDATE_CHANNEL_ID) {
+    return console.error("Missing DAILY_UPDATE_CHANNEL_ID.");
+  }
 
-  const channel = await client.channels.fetch(DAILY_UPDATE_CHANNEL_ID).catch(() => null);
-  if (!channel) return console.error("Could not find daily update channel.");
+  const channel = await client.channels
+    .fetch(DAILY_UPDATE_CHANNEL_ID)
+    .catch(() => null);
+
+  if (!channel) {
+    return console.error("Could not find daily update channel.");
+  }
 
   const selectedImages = pickRandomItems(
     imgurImages,
     Math.min(6, imgurImages.length)
   );
 
-  await channel.send(customMessage);
+  const files = [];
 
-  for (const imageUrl of selectedImages) {
-    await channel.send(imageUrl);
+  for (let i = 0; i < selectedImages.length; i++) {
+    const imageUrl = selectedImages[i];
+
+    try {
+      const response = await fetch(imageUrl);
+
+      if (!response.ok) {
+        console.error(`Failed to fetch image: ${imageUrl}`);
+        continue;
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      const extension =
+        imageUrl.split(".").pop().split("?")[0] || "png";
+
+      files.push(
+        new AttachmentBuilder(buffer, {
+          name: `daily-image-${i + 1}.${extension}`,
+        })
+      );
+    } catch (err) {
+      console.error(`Image download failed: ${imageUrl}`, err);
+    }
   }
+
+  await channel.send({
+    content: customMessage,
+    files,
+  });
 
   console.log("Daily update sent.");
 }
+
+
 
 client.once("ready", () => {
   console.log(`Bot is online as ${client.user.tag}`);
