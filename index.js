@@ -67,32 +67,21 @@ const client = new Client({
 });
 
 async function sendDailyUpdate(customMessage = DAILY_UPDATE_MESSAGE) {
-  if (!DAILY_UPDATE_CHANNEL_ID) {
-    console.error("Missing DAILY_UPDATE_CHANNEL_ID environment variable.");
-    return;
+  if (!DAILY_UPDATE_CHANNEL_ID) return console.error("Missing DAILY_UPDATE_CHANNEL_ID.");
+
+  const channel = await client.channels.fetch(DAILY_UPDATE_CHANNEL_ID).catch(() => null);
+  if (!channel) return console.error("Could not find daily update channel.");
+
+  const selectedImages = pickRandomItems(
+    imgurImages,
+    Math.min(6, imgurImages.length)
+  );
+
+  await channel.send(customMessage);
+
+  for (const imageUrl of selectedImages) {
+    await channel.send(imageUrl);
   }
-
-  const channel = await client.channels
-    .fetch(DAILY_UPDATE_CHANNEL_ID)
-    .catch(() => null);
-
-  if (!channel) {
-    console.error("Could not find daily update channel.");
-    return;
-  }
-
-  let selectedImages = [];
-
-  if (imgurImages.length > 0) {
-    selectedImages = pickRandomItems(
-      imgurImages,
-      Math.min(6, imgurImages.length)
-    );
-  }
-
-  await channel.send({
-    content: `${customMessage}\n${selectedImages.join("\n")}`,
-  });
 
   console.log("Daily update sent.");
 }
