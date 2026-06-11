@@ -126,19 +126,27 @@ client.once("ready", () => {
 // ?vip imgurImage accessVipContentLink clickChannelLink
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
-  if (!message.content.startsWith("?vip")) return;
 
-  const args = message.content.trim().split(/\s+/);
+// MANUAL DAILY TEST
+  if (message.content.startsWith("?dailytest")) {
+    try {
+      const customMessage = message.content
+        .replace("?dailytest", "")
+        .trim();
 
-  const imgurImage = args[1];
-  const accessVipContentLink = args[2];
-  const clickChannelLink = args[3];
+      await sendDailyUpdate(
+        customMessage || DAILY_UPDATE_MESSAGE
+      );
 
-  if (!imgurImage || !accessVipContentLink || !clickChannelLink) {
-    return message.reply(
-      "Usage: `?vip imgurImage accessVipContentLink clickChannelLink`"
-    );
+      return message.reply("✅ Daily update test sent.");
+    } catch (err) {
+      console.error(err);
+      return message.reply("❌ Failed to send test.");
+    }
   }
+
+// VIP COMMAND
+if (!message.content.startsWith("?vip")) return;
 
   const embed = new EmbedBuilder()
     .setColor(0x00ff66)
