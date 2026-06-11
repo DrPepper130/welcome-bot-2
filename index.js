@@ -69,7 +69,7 @@ async function sendDailyUpdate() {
   );
 
   await channel.send({
-    content: DAILY_UPDATE_MESSAGE,
+    content: customMessage,
     embeds,
   });
 
