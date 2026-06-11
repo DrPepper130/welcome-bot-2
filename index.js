@@ -81,26 +81,17 @@ async function sendDailyUpdate(customMessage = DAILY_UPDATE_MESSAGE) {
     return;
   }
 
-  let embeds = [];
+  let selectedImages = [];
 
   if (imgurImages.length > 0) {
-    const selectedImages = pickRandomItems(imgurImages, Math.min(6, imgurImages.length));
-
-    embeds = selectedImages.map((url, index) =>
-      new EmbedBuilder()
-        .setColor(0x00ff66)
-        .setImage(url)
-        .setFooter({ text: `Image ${index + 1} of 6` })
+    selectedImages = pickRandomItems(
+      imgurImages,
+      Math.min(6, imgurImages.length)
     );
-
-    console.log("Selected images:", selectedImages);
-  } else {
-    console.log("No images configured yet — sending text only.");
   }
 
   await channel.send({
-    content: customMessage,
-    embeds,
+    content: `${customMessage}\n${selectedImages.join("\n")}`,
   });
 
   console.log("Daily update sent.");
