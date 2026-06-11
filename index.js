@@ -138,10 +138,13 @@ client.on("messageCreate", async (message) => {
         customMessage || DAILY_UPDATE_MESSAGE
       );
 
-      return message.reply("✅ Daily update test sent.");
+      return message.reply("✅ Daily update actually posted.");
     } catch (err) {
       console.error(err);
-      return message.reply("❌ Failed to send test.");
+
+      return message.reply(
+        `❌ Failed:\n\`\`\`${err.message}\`\`\``
+      );
     }
   }
 
