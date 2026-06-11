@@ -1,7 +1,9 @@
 // index.js
-// Discord welcome bot + VIP embed command + tiny web server for Render
+// Discord welcome bot + VIP embed command + daily Imgur image update + tiny web server for Render
 
 const express = require("express");
+const cron = require("node-cron");
+
 const {
   Client,
   GatewayIntentBits,
@@ -21,8 +23,58 @@ const channelIDs = [
   "1512883502612221982",
   "1512883783987363930",
   "1512883791314681886",
-
 ];
+
+// ---- Daily update config ----
+const DAILY_UPDATE_CHANNEL_ID = process.env.DAILY_UPDATE_CHANNEL_ID;
+const DAILY_UPDATE_MESSAGE =
+  process.env.DAILY_UPDATE_MESSAGE || "🌙 Daily update!";
+
+const TIMEZONE = process.env.TIMEZONE || "America/Phoenix";
+
+const imgurImages = (process.env.IMGUR_IMAGES || "")
+  .split(",")
+  .map((url) => url.trim())
+  .filter(Boolean);
+
+function pickRandomItems(array, count) {
+  return [...array].sort(() => Math.random() - 0.5).slice(0, count);
+}
+
+async function sendDailyUpdate() {
+  if (!DAILY_UPDATE_CHANNEL_ID) {
+    console.error("Missing DAILY_UPDATE_CHANNEL_ID environment variable.");
+    return;
+  }
+
+  if (imgurImages.length < 6) {
+    console.error("IMGUR_IMAGES must contain at least 6 image URLs.");
+    return;
+  }
+
+  const channel = await client.channels.fetch(DAILY_UPDATE_CHANNEL_ID).catch(() => null);
+
+  if (!channel) {
+    console.error("Could not find daily update channel.");
+    return;
+  }
+
+  const selectedImages = pickRandomItems(imgurImages, 6);
+
+  const embeds = selectedImages.map((url, index) =>
+    new EmbedBuilder()
+      .setColor(0x00ff66)
+      .setImage(url)
+      .setFooter({ text: `Image ${index + 1} of 6` })
+  );
+
+  await channel.send({
+    content: DAILY_UPDATE_MESSAGE,
+    embeds,
+  });
+
+  console.log("Daily update sent.");
+}
 
 // ---- Web server ----
 const app = express();
@@ -51,6 +103,23 @@ const client = new Client({
 
 client.once("ready", () => {
   console.log(`Bot is online as ${client.user.tag}`);
+
+  // Runs every day at 12:00 AM in your timezone
+  cron.schedule(
+    "0 0 * * *",
+    async () => {
+      try {
+        await sendDailyUpdate();
+      } catch (err) {
+        console.error("Daily update failed:", err);
+      }
+    },
+    {
+      timezone: TIMEZONE,
+    }
+  );
+
+  console.log(`Daily update scheduled for 12:00 AM ${TIMEZONE}`);
 });
 
 // Command:
