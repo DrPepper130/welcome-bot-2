@@ -33,7 +33,14 @@ const channelIDs = [
 ];
 
 // ---- Daily update config ----
-const DAILY_UPDATE_CHANNEL_ID = process.env.DAILY_UPDATE_CHANNEL_ID;
+const DAILY_UPDATE_CHANNEL_IDS = (
+  process.env.DAILY_UPDATE_CHANNEL_IDS ||
+  process.env.DAILY_UPDATE_CHANNEL_ID ||
+  ""
+)
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
 const DAILY_UPDATE_MESSAGE =
   process.env.DAILY_UPDATE_MESSAGE || "🌙 Daily update!";
 
@@ -74,16 +81,10 @@ const client = new Client({
 });
 
 async function sendDailyUpdate(customMessage = DAILY_UPDATE_MESSAGE) {
-  if (!DAILY_UPDATE_CHANNEL_ID) {
-    return console.error("Missing DAILY_UPDATE_CHANNEL_ID.");
-  }
-
-  const channel = await client.channels
-    .fetch(DAILY_UPDATE_CHANNEL_ID)
-    .catch(() => null);
-
-  if (!channel) {
-    return console.error("Could not find daily update channel.");
+  if (DAILY_UPDATE_CHANNEL_IDS.length === 0) {
+    return console.error(
+      "Missing DAILY_UPDATE_CHANNEL_IDS environment variable."
+    );
   }
 
   const selectedImages = pickRandomItems(
@@ -91,7 +92,8 @@ async function sendDailyUpdate(customMessage = DAILY_UPDATE_MESSAGE) {
     Math.min(6, imgurImages.length)
   );
 
-  const files = [];
+  // Download the images once, then reuse the buffers for both servers.
+  const downloadedImages = [];
 
   for (let i = 0; i < selectedImages.length; i++) {
     const imageUrl = selectedImages[i];
@@ -100,32 +102,69 @@ async function sendDailyUpdate(customMessage = DAILY_UPDATE_MESSAGE) {
       const response = await fetch(imageUrl);
 
       if (!response.ok) {
-        console.error(`Failed to fetch image: ${imageUrl}`);
+        console.error(
+          `Failed to fetch image: ${imageUrl} (${response.status})`
+        );
         continue;
       }
 
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      const extension =
-        imageUrl.split(".").pop().split("?")[0] || "png";
+      let extension = imageUrl.split(".").pop()?.split("?")[0] || "png";
 
-      files.push(
-        new AttachmentBuilder(buffer, {
-          name: `daily-image-${i + 1}.${extension}`,
-        })
-      );
+      // Prevent invalid filenames when the URL does not have a normal extension.
+      if (!/^[a-zA-Z0-9]+$/.test(extension) || extension.length > 5) {
+        extension = "png";
+      }
+
+      downloadedImages.push({
+        buffer,
+        name: `daily-image-${i + 1}.${extension}`,
+      });
     } catch (err) {
       console.error(`Image download failed: ${imageUrl}`, err);
     }
   }
 
-  await channel.send({
-    content: customMessage,
-    files,
-  });
+  let successfulSends = 0;
 
-  console.log("Daily update sent.");
+  for (const channelId of DAILY_UPDATE_CHANNEL_IDS) {
+    try {
+      const channel = await client.channels.fetch(channelId).catch(() => null);
+
+      if (!channel || !channel.isTextBased()) {
+        console.error(
+          `Could not find text channel for daily update: ${channelId}`
+        );
+        continue;
+      }
+
+      // Create fresh AttachmentBuilder objects for each channel.
+      const files = downloadedImages.map(
+        ({ buffer, name }) =>
+          new AttachmentBuilder(buffer, {
+            name,
+          })
+      );
+
+      await channel.send({
+        content: customMessage,
+        files,
+      });
+
+      successfulSends++;
+      console.log(`Daily update sent to channel ${channelId}.`);
+    } catch (err) {
+      console.error(
+        `Daily update failed for channel ${channelId}:`,
+        err
+      );
+    }
+  }
+  console.log(
+    `Daily update completed: ${successfulSends}/${DAILY_UPDATE_CHANNEL_IDS.length} channels successful.`
+  );
 }
 
 
@@ -147,7 +186,9 @@ client.once("ready", () => {
     }
   );
 
-  console.log(`Daily update scheduled for 12:00 AM ${TIMEZONE}`);
+  console.log(
+    `Daily update scheduled for 12:00 AM ${TIMEZONE} in ${DAILY_UPDATE_CHANNEL_IDS.length} channels.`
+  );
 });
 
 client.on("messageCreate", async (message) => {
